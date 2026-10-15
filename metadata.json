@@ -1,0 +1,6 @@
+{
+  "name": "SmartStock — نظام إدارة مخزون قطع الغيار والمستهلكات",
+  "description": "نظام ذكي وشامل لإدارة مخزون قطع الغيار والمستهلكات وورش الصيانة والمصانع باللغة العربية مع نظام أذونات، تتبع الصلاحية، باركود، وتقارير تفصيلية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
