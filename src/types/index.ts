@@ -103,6 +103,7 @@ export interface Item {
   id: string;
   code: string; // e.g. "BRG-6204-2RS"
   name: string; // e.g. "رولمان بلي (محمل كريات) 6204-2RS"
+  partNumber?: string;
   categoryId: string;
   categoryName: string;
   unitId: string;
@@ -110,8 +111,13 @@ export interface Item {
   description: string;
   tracksExpiry: boolean;
   minStock: number;
+  reorderPoint?: number;
   isCritical: boolean; // صنف حرج
   avgCost: number; // متوسط التكلفة
+  unitCost?: number;
+  totalStock?: number;
+  createdAt?: string;
+  preferredSupplierId?: string;
   barcode: string; // e.g. "890123456001"
   isActive: boolean;
   totalQuantity: number;
@@ -268,5 +274,130 @@ export interface InventoryCountSession {
   conductedByUserId: string;
   conductedByUserName: string;
   notes?: string;
+}
+
+// 🏢 ملف تعريف المنشأة والشركة المستفيدة
+export interface CompanyProfile {
+  companyName: string; // اسم الشركة المستفيدة
+  factoryName: string; // اسم المصنع / المنشأة الإنتاجية
+  code: string;        // كود المصنع
+  commercialRegister: string; // السجل التجاري
+  taxNumber: string;   // البطاقة الضريبية
+  address: string;     // العنوان
+  phone: string;       // الهاتف
+  email: string;       // البريد الإلكتروني
+  managerName: string; // اسم مدير المصنع
+  currency: string;    // العملة
+}
+
+// 🛒 طلبات الشراء واقتراحات إدارة المشتريات
+export type RequisitionStatus = 
+  | 'draft'               // مسودة
+  | 'pending_approval'    // بانتظار اعتماد مدير المخازن / المصنع
+  | 'sent_to_purchasing'  // تم إرسالها لإدارة المشتريات
+  | 'ordered'             // تم إصدار أمر الشراء للموردين
+  | 'received'            // تم الاستلام في المخزن
+  | 'rejected';           // مرفوضة
+
+export type RequisitionReason = 
+  | 'shortage'      // نقص عن حد إعادة الطلب
+  | 'new_item'      // صنف جديد مضاف للمصنع
+  | 'high_demand'   // معدل سحب مرتفع خلال 60 يوم
+  | 'manual';       // إضافة يدوية مخصصة
+
+export interface PurchaseRequisitionItem {
+  id: string;
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  unit: string;
+  currentStock: number;
+  minQuantity: number;
+  reorderPoint: number;
+  consumptionLast60Days: number; // إجمالي ما تم سحبه خلال آخر 60 يوم
+  dailyBurnRate: number;         // معدل الاستهلاك اليومي
+  suggestedQuantity: number;     // الكمية المحسوبة والمقترحة بذكاء
+  requestedQuantity: number;     // الكمية المطلوبة فعلياً للتوريد
+  estimatedUnitPrice: number;    // التكلفة التقديرية للوحدة
+  totalPrice: number;            // إجمالي التكلفة التقديرية
+  preferredSupplierId?: string;
+  preferredSupplierName?: string;
+  reasonType: RequisitionReason;
+  notes?: string;
+}
+
+export interface PurchaseRequisition {
+  id: string;
+  prNumber: string;               // e.g. PR-2026-001
+  title: string;
+  department: string;             // الإدارة الطالبة
+  priority: 'urgent' | 'high' | 'normal' | 'low';
+  status: RequisitionStatus;
+  items: PurchaseRequisitionItem[];
+  totalEstimatedCost: number;
+  createdAt: string;
+  targetDeliveryDate: string;
+  createdByUserId: string;
+  createdByUserName: string;
+  approvedByUserName?: string;
+  sentToPurchasingAt?: string;
+  trackingNotes?: string;
+}
+
+// 🛠️ تذاكر وبلاغات الدعم الفني
+export type SupportCategory = 
+  | 'technical_issue'   // عطل فني في النظام
+  | 'inventory_inquiry' // استفسار عن مطابقة المخزون
+  | 'backup_cloud'      // النسخ الاحتياطي والسحابة
+  | 'scanner_hardware'  // قارئ الباركود والماسحات
+  | 'permission_access' // الصلاحيات والحسابات
+  | 'feature_request';  // طلب ميزة جديدة
+
+export interface SupportTicket {
+  id: string;
+  ticketNumber: string;
+  subject: string;
+  category: SupportCategory;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  description: string;
+  createdByUserId: string;
+  createdByUserName: string;
+  contactPhone?: string;
+  contactEmail?: string;
+  createdAt: string;
+  resolvedAt?: string;
+  assignedEngineer?: string;
+  responseNotes?: string;
+}
+
+// 💾 خطة وجدولة النسخ الاحتياطي في أكثر من مكان
+export interface BackupScheduleConfig {
+  autoBackupEnabled: boolean;
+  frequency: 'hourly' | 'daily' | 'weekly';
+  timeOfDay: string;              // e.g. "02:00"
+  retentionDays: number;
+  destinations: {
+    cloudStorage: boolean;        // Cloud Storage / AWS S3 / Azure
+    googleDrive: boolean;         // Google Drive / Workspace
+    localServerVault: boolean;    // خادم محلي / قرص داخلي مشفر
+    remoteMirrorSite: boolean;    // موقع احتياطي جغرافي بعيد
+  };
+  cloudBucketName: string;
+  cloudStatus: 'connected' | 'syncing' | 'offline';
+  lastBackupAt: string;
+  lastBackupSizeKB: number;
+  nextScheduledAt: string;
+}
+
+export interface BackupLogEntry {
+  id: string;
+  type: 'manual' | 'scheduled_auto' | 'cloud_mirror';
+  destinationAr: string;
+  timestamp: string;
+  sizeKB: number;
+  status: 'success' | 'failed';
+  recordsSummary: string;
+  filename: string;
 }
 

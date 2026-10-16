@@ -16,15 +16,27 @@ import {
   FileSpreadsheet,
   Upload,
   ShieldCheck,
-  Flame,
-  ClipboardCheck
+  ClipboardCheck,
+  ShoppingCart,
+  LifeBuoy,
+  Building2
 } from 'lucide-react';
 
 export const Navigation: React.FC = () => {
-  const { activeTab, setActiveTab, alerts, maintenanceRequests, adjustments, currentUser } = useApp();
+  const {
+    activeTab,
+    setActiveTab,
+    alerts,
+    maintenanceRequests,
+    adjustments,
+    currentUser,
+    companyProfile,
+    purchaseRequisitions
+  } = useApp();
 
   const openAlertsCount = alerts.filter((a) => a.status === 'open').length;
   const pendingRequestsCount = maintenanceRequests.filter((r) => r.status === 'submitted' || r.status === 'approved').length;
+  const pendingPurchasesCount = purchaseRequisitions.filter((p) => p.status === 'sent_to_purchasing' || p.status === 'draft').length;
 
   const tabs = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
@@ -36,6 +48,13 @@ export const Navigation: React.FC = () => {
       icon: ClipboardCheck,
       badge: adjustments.length > 0 ? adjustments.length : undefined,
       badgeColor: 'bg-purple-800',
+    },
+    {
+      id: 'procurement',
+      label: 'طلبات واقتراحات الشراء',
+      icon: ShoppingCart,
+      badge: pendingPurchasesCount > 0 ? pendingPurchasesCount : undefined,
+      badgeColor: 'bg-emerald-700',
     },
     {
       id: 'requests',
@@ -56,6 +75,7 @@ export const Navigation: React.FC = () => {
     { id: 'reports', label: 'تقارير الإدارات واتخاذ القرارات', icon: FileSpreadsheet },
     { id: 'import', label: 'استيراد الأصناف', icon: Upload },
     { id: 'audit', label: 'التدقيق والصلاحيات', icon: ShieldCheck },
+    { id: 'support-backup', label: 'الدعم الفني والنسخ الاحتياطي', icon: LifeBuoy },
   ];
 
   return (
@@ -93,9 +113,9 @@ export const Navigation: React.FC = () => {
         </div>
       </div>
 
-      {/* Role Notice Banner */}
+      {/* Role Notice & Beneficiary Company Banner */}
       <div className="bg-purple-50/70 border-t border-purple-100/60 py-1.5 px-4 text-xs text-purple-900 flex items-center justify-between">
-        <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
+        <div className="max-w-7xl mx-auto w-full flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1 font-semibold text-purple-800">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -105,9 +125,14 @@ export const Navigation: React.FC = () => {
               {currentUser.fullName} — {currentUser.roleTitleAr}
             </span>
           </div>
-          <div className="hidden md:flex items-center gap-2 text-purple-700 text-[11px]">
-            <Flame className="h-3.5 w-3.5 text-amber-500" />
-            <span>نظام تجريبي متكامل مع كافة متطلبات PDR بالألوان الأرجوانية واللغة العربية</span>
+
+          {/* Beneficiary Company & Factory Name Display */}
+          <div className="flex items-center gap-2 text-purple-900 text-xs font-medium">
+            <Building2 className="h-4 w-4 text-purple-700 shrink-0" />
+            <span className="text-purple-700 font-bold hidden sm:inline">الجهة المستفيدة من النظام:</span>
+            <span className="font-bold text-purple-950 bg-white/90 px-2.5 py-0.5 rounded-lg border border-purple-200/80 shadow-xs">
+              {companyProfile.companyName} — {companyProfile.factoryName}
+            </span>
           </div>
         </div>
       </div>

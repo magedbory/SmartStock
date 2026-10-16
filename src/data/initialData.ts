@@ -6,7 +6,8 @@
 import {
   User, Category, Unit, Warehouse, Supplier, Item, StockMovement,
   MaintenanceRequest, InventoryAlert, AuditLog,
-  InventoryAdjustmentRecord, InventoryCountSession
+  InventoryAdjustmentRecord, InventoryCountSession,
+  CompanyProfile, PurchaseRequisition, SupportTicket, BackupScheduleConfig, BackupLogEntry
 } from '../types';
 
 export const INITIAL_USERS: User[] = [
@@ -896,6 +897,192 @@ export const INITIAL_COUNT_SESSIONS: InventoryCountSession[] = [
     conductedByUserId: 'USR-001',
     conductedByUserName: 'أحمد محمود (مدير المستودع)',
     notes: 'تم فحص الرفوف A و B و C بحضور ممثل الإدارة المالية وتمت التسويات بنجاح',
+  },
+];
+
+// 🏢 ملف تعريف المصنع والشركة المستفيدة الافتراضي
+export const INITIAL_COMPANY_PROFILE: CompanyProfile = {
+  companyName: 'شركة النصر للصناعات الهندسية والتصنيع الذكي',
+  factoryName: 'مجمع مصانع العاشر من رمضان — خطوط الإنتاج والتشغيل الآلي',
+  code: 'FAC-EGY-10TH',
+  commercialRegister: 'س.ت: 489201 / جيزة',
+  taxNumber: 'ب.ض: 382-910-442',
+  address: 'المنطقة الصناعية الثالثة B4، الكيلو 54، العاشر من رمضان، مصر',
+  phone: '+20 100 234 5678',
+  email: 'stock.management@elnasr-ind.com',
+  managerName: 'م. حسام الدين نبيل (المدير التنفيذي ومدير المصنع)',
+  currency: 'ج.م',
+};
+
+// 🛒 طلبات الشراء واقتراحات إدارة المشتريات
+export const INITIAL_PURCHASE_REQUISITIONS: PurchaseRequisition[] = [
+  {
+    id: 'PR-2026-001',
+    prNumber: 'PR-2026-001',
+    title: 'طلب شراء عاجل — تعويض النواقص الحرجة لخطوط الإنتاج',
+    department: 'إدارة المستودعات والصيانة العامة',
+    priority: 'urgent',
+    status: 'sent_to_purchasing',
+    createdAt: '2026-10-14 12:30',
+    targetDeliveryDate: '2026-10-22',
+    createdByUserId: 'USR-001',
+    createdByUserName: 'أحمد محمود (مدير المستودع)',
+    approvedByUserName: 'م. حسام الدين نبيل (مدير المصنع)',
+    sentToPurchasingAt: '2026-10-14 14:00',
+    trackingNotes: 'تم إرسال الطلب لإدارة المشتريات وجاري تلقي عروض الأسعار من الموردين المعتمدين',
+    totalEstimatedCost: 6600.0,
+    items: [
+      {
+        id: 'PRI-001',
+        itemId: 'ITM-002',
+        itemCode: 'BELT-SPZ-1250',
+        itemName: 'سير محرك ناقل للحركة SPZ-1250',
+        unit: 'قطعة',
+        currentStock: 3,
+        minQuantity: 8,
+        reorderPoint: 10,
+        consumptionLast60Days: 16,
+        dailyBurnRate: 0.27,
+        suggestedQuantity: 12,
+        requestedQuantity: 12,
+        estimatedUnitPrice: 180.0,
+        totalPrice: 2160.0,
+        preferredSupplierId: 'SUP-002',
+        preferredSupplierName: 'شركة النيل للسيور والكاوتشوك الصناعي',
+        reasonType: 'shortage',
+        notes: 'الرصيد 3 قطع فقط والحد الأدنى 8 قطع. معدل السحب الشهري 8 قطع!',
+      },
+      {
+        id: 'PRI-002',
+        itemId: 'ITM-005',
+        itemCode: 'VLV-SOL-24VDC',
+        itemName: 'صمام كهرومغناطيسي نيوماتيك 24V',
+        unit: 'قطعة',
+        currentStock: 2,
+        minQuantity: 5,
+        reorderPoint: 6,
+        consumptionLast60Days: 9,
+        dailyBurnRate: 0.15,
+        suggestedQuantity: 8,
+        requestedQuantity: 8,
+        estimatedUnitPrice: 550.0,
+        totalPrice: 4400.0,
+        preferredSupplierId: 'SUP-001',
+        preferredSupplierName: 'المتحدة للتوريدات الميكانيكية والهندسية',
+        reasonType: 'shortage',
+        notes: 'صمام التحكم بالأذرع الهوائية للروبوت الصناعي بخط التعبئة',
+      },
+      {
+        id: 'PRI-003',
+        itemId: 'ITM-008',
+        itemCode: 'BRG-6204-2RS',
+        itemName: 'رمان بلي ذو غطاءين BRG 6204-2RS',
+        unit: 'قطعة',
+        currentStock: 5,
+        minQuantity: 10,
+        reorderPoint: 12,
+        consumptionLast60Days: 24,
+        dailyBurnRate: 0.40,
+        suggestedQuantity: 20,
+        requestedQuantity: 20,
+        estimatedUnitPrice: 160.0,
+        totalPrice: 3200.0,
+        preferredSupplierId: 'SUP-001',
+        preferredSupplierName: 'المتحدة للتوريدات الميكانيكية والهندسية',
+        reasonType: 'high_demand',
+        notes: 'سحب مكثف من قبل ورشة الصيانة الميكانيكية خلال آخر 60 يوم',
+      },
+    ],
+  },
+];
+
+// 💾 الإعداد الافتراضي لجدولة النسخ الاحتياطي في أكثر من مكان
+export const INITIAL_BACKUP_CONFIG: BackupScheduleConfig = {
+  autoBackupEnabled: true,
+  frequency: 'daily',
+  timeOfDay: '02:00',
+  retentionDays: 60,
+  destinations: {
+    cloudStorage: true,     // Cloud Storage / AWS S3
+    googleDrive: true,      // Google Drive Backup Folder
+    localServerVault: true, // Internal NAS / Server drive
+    remoteMirrorSite: true, // Secondary Geo-redundant Site
+  },
+  cloudBucketName: 'gs://smartstock-factory-backups-live/elnasr-ind',
+  cloudStatus: 'connected',
+  lastBackupAt: '2026-10-15 02:00',
+  lastBackupSizeKB: 418.5,
+  nextScheduledAt: '2026-10-16 02:00',
+};
+
+// 💾 سجل النسخ الاحتياطية السابقة
+export const INITIAL_BACKUP_LOGS: BackupLogEntry[] = [
+  {
+    id: 'BCK-LOG-001',
+    type: 'scheduled_auto',
+    destinationAr: 'سحابة Google Cloud Storage + مزامنة Google Drive',
+    timestamp: '2026-10-15 02:00',
+    sizeKB: 418.5,
+    status: 'success',
+    recordsSummary: '8 أصناف، 14 حركة مخزنية، 4 طلبات صيانة، 5 مستخدمين، 3 تسويات جرد',
+    filename: 'smartstock_backup_20261015_0200.json',
+  },
+  {
+    id: 'BCK-LOG-002',
+    type: 'scheduled_auto',
+    destinationAr: 'خادم المصنع المحلي (Local Server Vault) + السحابة',
+    timestamp: '2026-10-14 02:00',
+    sizeKB: 409.2,
+    status: 'success',
+    recordsSummary: '8 أصناف، 12 حركة مخزنية، 3 طلبات صيانة، 5 مستخدمين',
+    filename: 'smartstock_backup_20261014_0200.json',
+  },
+  {
+    id: 'BCK-LOG-003',
+    type: 'manual',
+    destinationAr: 'تنزيل فوري مشفر (Instant Local Download)',
+    timestamp: '2026-10-12 16:45',
+    sizeKB: 395.0,
+    status: 'success',
+    recordsSummary: 'نسخة ما قبل الجرد الشامل الشهري لشهر أكتوبر',
+    filename: 'smartstock_pre_inventory_backup.json',
+  },
+];
+
+// 🛠️ تذاكر وبلاغات الدعم الفني الافتراضية
+export const INITIAL_SUPPORT_TICKETS: SupportTicket[] = [
+  {
+    id: 'TKT-2026-001',
+    ticketNumber: 'TKT-2026-001',
+    subject: 'طلب ضبط قارئ الباركود اللاسلكي Zebra في المستودع الفرعي B',
+    category: 'scanner_hardware',
+    priority: 'medium',
+    status: 'resolved',
+    description: 'تم شراء ماسح باركود لاسلكي جديد نحتاج تفعيل صيغة قراءة كود QR الموحدة لقطع الغيار',
+    createdByUserId: 'USR-001',
+    createdByUserName: 'أحمد محمود (مدير المستودع)',
+    contactPhone: '+20 100 234 5678',
+    contactEmail: 'ahmed.m@elnasr-ind.com',
+    createdAt: '2026-10-10 11:20',
+    resolvedAt: '2026-10-10 14:15',
+    assignedEngineer: 'م. كريم سامي (فريق الدعم الفني للأنظمة)',
+    responseNotes: 'تم تهيئة إعدادات مسح QR Code بنجاح واختبار مسح 10 أصناف على الهواء مباشرة.',
+  },
+  {
+    id: 'TKT-2026-002',
+    ticketNumber: 'TKT-2026-002',
+    subject: 'طلب مراجعة الربط السحابي ومزامنة النسخ الاحتياطية لفرع المصنع',
+    category: 'backup_cloud',
+    priority: 'high',
+    status: 'in_progress',
+    description: 'نرجو التأكد من اكتمال رفع النسخ المشفرة على Bucket السحابة بجدول زمني بعد انتهاء وردية الليل.',
+    createdByUserId: 'USR-001',
+    createdByUserName: 'أحمد محمود (مدير المستودع)',
+    contactPhone: '+20 100 234 5678',
+    contactEmail: 'ahmed.m@elnasr-ind.com',
+    createdAt: '2026-10-14 09:30',
+    assignedEngineer: 'م. عمر طارق (مهندس البنية التحتية والسحابة)',
+    responseNotes: 'جاري فحص إذن التخزين السحابي والتأكد من تفعيل التشفير بمفتاح AES-256.',
   },
 ];
 

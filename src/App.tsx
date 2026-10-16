@@ -19,6 +19,8 @@ import { ReportsExportView } from './views/ReportsExportView';
 import { ImportExcelView } from './views/ImportExcelView';
 import { AuditUsersView } from './views/AuditUsersView';
 import { InventoryCountView } from './views/InventoryCountView';
+import { PurchaseRequisitionsView } from './views/PurchaseRequisitionsView';
+import { SupportBackupView } from './views/SupportBackupView';
 
 import { BarcodeScannerModal } from './components/BarcodeScannerModal';
 import { BarcodeLabelModal } from './components/BarcodeLabelModal';
@@ -30,7 +32,7 @@ import { AuthSwitchModal } from './components/AuthSwitchModal';
 import { CheckCircle2, AlertCircle, Info, Boxes } from 'lucide-react';
 
 const MainLayout: React.FC = () => {
-  const { activeTab, toast } = useApp();
+  const { activeTab, toast, companyProfile } = useApp();
 
   const renderActiveView = () => {
     switch (activeTab) {
@@ -42,6 +44,8 @@ const MainLayout: React.FC = () => {
         return <MovementsView />;
       case 'count':
         return <InventoryCountView />;
+      case 'procurement':
+        return <PurchaseRequisitionsView />;
       case 'requests':
         return <MaintenanceWorkflowView />;
       case 'locations':
@@ -56,6 +60,8 @@ const MainLayout: React.FC = () => {
         return <ImportExcelView />;
       case 'audit':
         return <AuditUsersView />;
+      case 'support-backup':
+        return <SupportBackupView />;
       default:
         return <DashboardView />;
     }
@@ -105,7 +111,8 @@ const MainLayout: React.FC = () => {
               <Boxes className="h-4 w-4" />
             </div>
             <span className="font-bold text-purple-950">SmartStock — نظام إدارة مخزون قطع الغيار والمستهلكات</span>
-            <span className="text-slate-400">| مستند المتطلبات PRD v1.0</span>
+            <span className="text-slate-400">|</span>
+            <span className="text-purple-800 font-bold">{companyProfile.companyName} ({companyProfile.factoryName})</span>
           </div>
           <div className="flex items-center gap-3 text-slate-600 font-medium">
             <span>واجهة عربية متكاملة RTL</span>

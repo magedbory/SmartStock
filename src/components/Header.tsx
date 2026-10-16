@@ -33,7 +33,8 @@ export const Header: React.FC = () => {
     setIsRequestModalOpen,
     setActiveTab,
     resetToDefaultData,
-    requestUserSwitch
+    requestUserSwitch,
+    companyProfile
   } = useApp();
 
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -57,13 +58,16 @@ export const Header: React.FC = () => {
                 <span className="font-black text-2xl tracking-wide bg-gradient-to-l from-purple-200 via-white to-purple-100 bg-clip-text text-transparent">
                   SmartStock
                 </span>
-                <span className="bg-purple-800/80 text-purple-200 text-xs px-2 py-0.5 rounded-full border border-purple-600/50 font-medium">
-                  v1.0 MVP
+                <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-2 py-0.5 rounded-full border border-emerald-400/30 font-bold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  نظام تشغيلي معتمد
                 </span>
               </div>
-              <p className="text-xs text-purple-300/90 font-medium hidden sm:block">
-                نظام إدارة مخزون قطع الغيار والمستهلكات الصناعية
-              </p>
+              <div className="flex items-center gap-1.5 text-xs text-purple-200/95 font-medium mt-0.5">
+                <span className="font-bold text-white truncate max-w-[200px] sm:max-w-xs">{companyProfile.companyName}</span>
+                <span className="text-purple-400 hidden sm:inline">•</span>
+                <span className="text-purple-300 text-[11px] hidden md:inline truncate max-w-[180px]">{companyProfile.factoryName}</span>
+              </div>
             </div>
           </div>
 

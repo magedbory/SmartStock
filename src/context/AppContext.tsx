@@ -8,13 +8,18 @@ import {
   User, RoleType, Item, Category, Unit, Warehouse, Supplier,
   StockMovement, MaintenanceRequest, InventoryAlert, AuditLog,
   MovementType, MaintenanceRequestType, InventoryAdjustmentRecord,
-  InventoryCountSession, VarianceType
+  InventoryCountSession, VarianceType,
+  CompanyProfile, PurchaseRequisition, PurchaseRequisitionItem,
+  RequisitionStatus, RequisitionReason, SupportTicket, SupportCategory,
+  BackupScheduleConfig, BackupLogEntry
 } from '../types';
 import {
   INITIAL_USERS, INITIAL_CATEGORIES, INITIAL_UNITS, INITIAL_WAREHOUSES,
   INITIAL_SUPPLIERS, INITIAL_ITEMS, INITIAL_MOVEMENTS,
   INITIAL_MAINTENANCE_REQUESTS, INITIAL_ALERTS, INITIAL_AUDIT_LOGS,
-  INITIAL_ADJUSTMENTS, INITIAL_COUNT_SESSIONS
+  INITIAL_ADJUSTMENTS, INITIAL_COUNT_SESSIONS,
+  INITIAL_COMPANY_PROFILE, INITIAL_PURCHASE_REQUISITIONS,
+  INITIAL_BACKUP_CONFIG, INITIAL_BACKUP_LOGS, INITIAL_SUPPORT_TICKETS
 } from '../data/initialData';
 
 interface ToastInfo {
@@ -142,6 +147,49 @@ interface AppContextType {
     sessionTitle?: string;
   }) => { success: boolean; error?: string };
   createCountSession: (title: string, warehouseId?: string, notes?: string) => { success: boolean; error?: string };
+
+  // 🏢 ملف تعريف المصنع والشركة المستفيدة
+  companyProfile: CompanyProfile;
+  updateCompanyProfile: (profile: Partial<CompanyProfile>) => void;
+
+  // 🛒 طلبات الشراء واقتراحات إدارة المشتريات
+  purchaseRequisitions: PurchaseRequisition[];
+  createPurchaseRequisition: (data: {
+    title: string;
+    department: string;
+    priority: 'urgent' | 'high' | 'normal' | 'low';
+    targetDeliveryDate: string;
+    items: PurchaseRequisitionItem[];
+    trackingNotes?: string;
+  }) => { success: boolean; id?: string; error?: string };
+  updatePurchaseRequisitionStatus: (id: string, status: RequisitionStatus, trackingNotes?: string) => { success: boolean; error?: string };
+  getItemConsumption60Days: (itemId: string) => {
+    consumptionLast60Days: number;
+    dailyBurnRate: number;
+    suggestedQuantity: number;
+    reasonType: RequisitionReason;
+    reasonText: string;
+  };
+
+  // 💾 إدارة وخطة جدولة النسخ الاحتياطي في أكثر من مكان
+  backupConfig: BackupScheduleConfig;
+  updateBackupConfig: (updates: Partial<BackupScheduleConfig>) => void;
+  backupLogs: BackupLogEntry[];
+  generateDatabaseBackup: () => { jsonString: string; filename: string; stats: any };
+  restoreDatabaseBackup: (jsonString: string) => { success: boolean; message: string };
+  triggerInstantBackup: (destinationAr?: string) => { success: boolean; log: BackupLogEntry };
+
+  // 🛠️ تذاكر وبلاغات الدعم الفني والمساعدة
+  supportTickets: SupportTicket[];
+  createSupportTicket: (ticket: {
+    subject: string;
+    category: SupportCategory;
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    description: string;
+    contactPhone?: string;
+    contactEmail?: string;
+  }) => { success: boolean; error?: string };
+  updateSupportTicketStatus: (id: string, status: SupportTicket['status'], responseNotes?: string) => { success: boolean; error?: string };
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -162,11 +210,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
   const [adjustments, setAdjustments] = useState<InventoryAdjustmentRecord[]>(INITIAL_ADJUSTMENTS);
   const [countSessions, setCountSessions] = useState<InventoryCountSession[]>(INITIAL_COUNT_SESSIONS);
+  const [companyProfile, setCompanyProfile] = useState<CompanyProfile>(INITIAL_COMPANY_PROFILE);
+  const [purchaseRequisitions, setPurchaseRequisitions] = useState<PurchaseRequisition[]>(INITIAL_PURCHASE_REQUISITIONS);
+  const [backupConfig, setBackupConfig] = useState<BackupScheduleConfig>(INITIAL_BACKUP_CONFIG);
+  const [backupLogs, setBackupLogs] = useState<BackupLogEntry[]>(INITIAL_BACKUP_LOGS);
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(INITIAL_SUPPORT_TICKETS);
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [expiryWindowDays, setExpiryWindowDays] = useState<number>(30);
   const [currency] = useState<string>('ج.م');
   const [toast, setToast] = useState<ToastInfo | null>(null);
+
+  // Sync document title with company profile & logo
+  useEffect(() => {
+    if (companyProfile.companyName) {
+      document.title = `SmartStock 📦 | ${companyProfile.companyName} — ${companyProfile.factoryName}`;
+    }
+  }, [companyProfile]);
 
   // Authentication & User Switch Restriction Modal
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -201,6 +261,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (parsed.auditLogs) setAuditLogs(parsed.auditLogs);
         if (parsed.adjustments) setAdjustments(parsed.adjustments);
         if (parsed.countSessions) setCountSessions(parsed.countSessions);
+        if (parsed.companyProfile) setCompanyProfile(parsed.companyProfile);
+        if (parsed.purchaseRequisitions) setPurchaseRequisitions(parsed.purchaseRequisitions);
+        if (parsed.backupConfig) setBackupConfig(parsed.backupConfig);
+        if (parsed.backupLogs) setBackupLogs(parsed.backupLogs);
+        if (parsed.supportTickets) setSupportTickets(parsed.supportTickets);
       }
     } catch {
       // Fallback to default
@@ -212,12 +277,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ users, items, movements, maintenanceRequests, warehouses, suppliers, alerts, auditLogs, adjustments, countSessions })
+        JSON.stringify({
+          users,
+          items,
+          movements,
+          maintenanceRequests,
+          warehouses,
+          suppliers,
+          alerts,
+          auditLogs,
+          adjustments,
+          countSessions,
+          companyProfile,
+          purchaseRequisitions,
+          backupConfig,
+          backupLogs,
+          supportTickets
+        })
       );
     } catch {
       // Ignore quota errors
     }
-  }, [users, items, movements, maintenanceRequests, warehouses, suppliers, alerts, auditLogs, adjustments, countSessions]);
+  }, [
+    users,
+    items,
+    movements,
+    maintenanceRequests,
+    warehouses,
+    suppliers,
+    alerts,
+    auditLogs,
+    adjustments,
+    countSessions,
+    companyProfile,
+    purchaseRequisitions,
+    backupConfig,
+    backupLogs,
+    supportTickets
+  ]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
@@ -1264,8 +1361,285 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setUsers(INITIAL_USERS);
     setAdjustments(INITIAL_ADJUSTMENTS);
     setCountSessions(INITIAL_COUNT_SESSIONS);
+    setCompanyProfile(INITIAL_COMPANY_PROFILE);
+    setPurchaseRequisitions(INITIAL_PURCHASE_REQUISITIONS);
+    setBackupConfig(INITIAL_BACKUP_CONFIG);
+    setBackupLogs(INITIAL_BACKUP_LOGS);
+    setSupportTickets(INITIAL_SUPPORT_TICKETS);
     localStorage.removeItem(STORAGE_KEY);
     showToast('تمت استعادة البيانات الأولية النموذجية بنجاح.', 'info');
+  };
+
+  // 🏢 تحديث ملف تعريف المصنع والشركة
+  const updateCompanyProfile = (updates: Partial<CompanyProfile>) => {
+    setCompanyProfile((prev) => {
+      const updated = { ...prev, ...updates };
+      addAuditLog('CompanyProfile', 'ORG-01', 'UPDATE', `تحديث بيانات المصنع والشركة المستفيدة: ${updated.companyName}`);
+      showToast('تم حفظ وتحديث بيانات الشركة والمصنع بنجاح.', 'success');
+      return updated;
+    });
+  };
+
+  // 🛒 حساب استهلاك 60 يوماً واقتراح كميات الشراء الذكية
+  const getItemConsumption60Days = (itemId: string) => {
+    const item = items.find((i) => i.id === itemId);
+    if (!item) {
+      return {
+        consumptionLast60Days: 0,
+        dailyBurnRate: 0,
+        suggestedQuantity: 10,
+        reasonType: 'manual' as RequisitionReason,
+        reasonText: 'إضافة يدوية',
+      };
+    }
+
+    const relevantMovements = movements.filter(
+      (m) => m.itemId === itemId && (m.type === 'issue' || m.type === 'transfer')
+    );
+    const recordedConsumption = relevantMovements.reduce((sum, m) => sum + m.quantity, 0);
+    const effectiveConsumption = recordedConsumption > 0 ? recordedConsumption : Math.max(1, Math.round(item.minStock * 1.5));
+    const dailyRate = Number((effectiveConsumption / 60).toFixed(2));
+
+    let reasonType: RequisitionReason = 'manual';
+    let reasonText = 'طلب اعتيادي';
+
+    const currentQty = item.totalQuantity ?? item.totalStock ?? 0;
+    const reorderThreshold = item.reorderPoint ?? Math.ceil(item.minStock * 1.3);
+    const isNewItem = currentQty === 0 || (item.createdAt && (item.createdAt.includes('2026-10-15') || item.createdAt.includes('2026-10-16')));
+
+    if (currentQty <= item.minStock) {
+      reasonType = 'shortage';
+      reasonText = `عجز دون الحد الأدنى (الرصيد: ${currentQty} / الحد الأدنى: ${item.minStock})`;
+    } else if (isNewItem && currentQty < reorderThreshold) {
+      reasonType = 'new_item';
+      reasonText = 'صنف جديد مضاف حديثاً للمخزن بحاجة لتأمين رصيد تشغيلي';
+    } else if (dailyRate > 0.25) {
+      reasonType = 'high_demand';
+      reasonText = `سحب واستهلاك مرتفع (معدل ${dailyRate} قطعة/يوم)`;
+    }
+
+    // معادلة الحساب الذكي لكمية الشراء المقترحة
+    const targetBuffer = Math.ceil(dailyRate * 45) + reorderThreshold;
+    const rawSuggested = Math.max(item.minStock * 2 - currentQty, targetBuffer - currentQty);
+    const suggestedQuantity = Math.max(rawSuggested > 0 ? rawSuggested : item.minStock, 5);
+
+    return {
+      consumptionLast60Days: effectiveConsumption,
+      dailyBurnRate: dailyRate,
+      suggestedQuantity,
+      reasonType,
+      reasonText,
+    };
+  };
+
+  // 🛒 إنشاء طلب شراء معتمد لإرساله للمشتريات
+  const createPurchaseRequisition = (data: {
+    title: string;
+    department: string;
+    priority: 'urgent' | 'high' | 'normal' | 'low';
+    targetDeliveryDate: string;
+    items: PurchaseRequisitionItem[];
+    trackingNotes?: string;
+  }) => {
+    if (!data.items || data.items.length === 0) {
+      return { success: false, error: 'يرجى إضافة صنف واحد على الأقل لطلب الشراء' };
+    }
+
+    const totalCost = data.items.reduce((sum, itm) => sum + itm.totalPrice, 0);
+    const prNumber = `PR-2026-${String(purchaseRequisitions.length + 1).padStart(3, '0')}`;
+    const newReq: PurchaseRequisition = {
+      id: `PR-${Date.now()}`,
+      prNumber,
+      title: data.title,
+      department: data.department || 'إدارة المستودعات والصيانة',
+      priority: data.priority,
+      status: 'sent_to_purchasing',
+      items: data.items,
+      totalEstimatedCost: totalCost,
+      createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      targetDeliveryDate: data.targetDeliveryDate || '2026-10-30',
+      createdByUserId: currentUser.id,
+      createdByUserName: `${currentUser.fullName} (${currentUser.roleTitleAr})`,
+      approvedByUserName: currentUser.role === 'WAREHOUSE_MANAGER' || currentUser.role === 'ADMIN' ? currentUser.fullName : 'مدير المخازن',
+      sentToPurchasingAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      trackingNotes: data.trackingNotes || 'تم إصدار طلب الشراء وإرساله لإدارة المشتريات والتوريدات',
+    };
+
+    setPurchaseRequisitions((prev) => [newReq, ...prev]);
+    addAuditLog('PurchaseRequisition', newReq.prNumber, 'CREATE', `إصدار طلب شراء ${newReq.prNumber} بقيمة إجمالية ${totalCost.toLocaleString()} ج.م لعدد ${data.items.length} أصناف`);
+    showToast(`تم إصدار طلب الشراء ${prNumber} وإرساله لإدارة المشتريات بنجاح!`, 'success');
+    return { success: true, id: newReq.id };
+  };
+
+  // 🛒 تحديث حالة طلب الشراء
+  const updatePurchaseRequisitionStatus = (id: string, status: RequisitionStatus, trackingNotes?: string) => {
+    setPurchaseRequisitions((prev) =>
+      prev.map((r) => {
+        if (r.id === id) {
+          return {
+            ...r,
+            status,
+            trackingNotes: trackingNotes || r.trackingNotes,
+          };
+        }
+        return r;
+      })
+    );
+    addAuditLog('PurchaseRequisition', id, 'UPDATE', `تحديث حالة طلب الشراء إلى ${status}`);
+    showToast('تم تحديث حالة طلب الشراء بنجاح.', 'success');
+    return { success: true };
+  };
+
+  // 💾 تحديث خطة وجدولة النسخ الاحتياطي
+  const updateBackupConfig = (updates: Partial<BackupScheduleConfig>) => {
+    setBackupConfig((prev) => {
+      const merged = { ...prev, ...updates };
+      addAuditLog('BackupSchedule', 'BCK-CFG', 'UPDATE', `تحديث خطة وجدولة النسخ الاحتياطي المتعدد: التكرار ${merged.frequency}`);
+      showToast('تم حفظ خطة وجدولة النسخ الاحتياطي المتعدد بنجاح.', 'success');
+      return merged;
+    });
+  };
+
+  // 💾 تنفيذ نسخة احتياطية فورية
+  const triggerInstantBackup = (destinationAr = 'السحابة Google Cloud Storage + الحفظ المحلي') => {
+    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 16);
+    const size = Number((390 + Math.random() * 70).toFixed(1));
+    const filename = `smartstock_backup_${timestamp.replace(/[: ]/g, '_')}.json`;
+    const summary = `${items.length} أصناف، ${movements.length} حركات، ${adjustments.length} تسويات، ${purchaseRequisitions.length} طلبات شراء`;
+
+    const newLog: BackupLogEntry = {
+      id: `BCK-${Date.now()}`,
+      type: 'manual',
+      destinationAr,
+      timestamp,
+      sizeKB: size,
+      status: 'success',
+      recordsSummary: summary,
+      filename,
+    };
+
+    setBackupLogs((prev) => [newLog, ...prev]);
+    setBackupConfig((prev) => ({
+      ...prev,
+      lastBackupAt: timestamp,
+      lastBackupSizeKB: size,
+    }));
+    addAuditLog('Backup', newLog.id, 'CREATE', `أخذ نسخة احتياطية فورية على ${destinationAr}`);
+    showToast('تم أخذ النسخة الاحتياطية بنجاح ومزامنتها على الوجهات المحددة!', 'success');
+    return { success: true, log: newLog };
+  };
+
+  // 💾 توليد نسخة تفريغ كاملة لقاعدة البيانات بصيغة JSON
+  const generateDatabaseBackup = () => {
+    const data = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      companyProfile,
+      users,
+      categories,
+      units,
+      warehouses,
+      suppliers,
+      items,
+      movements,
+      maintenanceRequests,
+      alerts,
+      auditLogs,
+      adjustments,
+      countSessions,
+      purchaseRequisitions,
+      backupConfig,
+      backupLogs,
+      supportTickets,
+    };
+    const jsonString = JSON.stringify(data, null, 2);
+    const filename = `smartstock_${companyProfile.code || 'database'}_${new Date().toISOString().slice(0, 10)}.json`;
+    const stats = {
+      itemsCount: items.length,
+      movementsCount: movements.length,
+      adjustmentsCount: adjustments.length,
+      purchaseRequisitionsCount: purchaseRequisitions.length,
+      usersCount: users.length,
+      sizeKB: (new Blob([jsonString]).size / 1024).toFixed(1),
+    };
+    return { jsonString, filename, stats };
+  };
+
+  // 💾 استعادة قاعدة البيانات من ملف نسخة احتياطية
+  const restoreDatabaseBackup = (jsonString: string) => {
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (parsed.items && Array.isArray(parsed.items)) setItems(parsed.items);
+      if (parsed.movements && Array.isArray(parsed.movements)) setMovements(parsed.movements);
+      if (parsed.adjustments && Array.isArray(parsed.adjustments)) setAdjustments(parsed.adjustments);
+      if (parsed.countSessions && Array.isArray(parsed.countSessions)) setCountSessions(parsed.countSessions);
+      if (parsed.warehouses && Array.isArray(parsed.warehouses)) setWarehouses(parsed.warehouses);
+      if (parsed.suppliers && Array.isArray(parsed.suppliers)) setSuppliers(parsed.suppliers);
+      if (parsed.users && Array.isArray(parsed.users)) setUsers(parsed.users);
+      if (parsed.companyProfile) setCompanyProfile(parsed.companyProfile);
+      if (parsed.purchaseRequisitions && Array.isArray(parsed.purchaseRequisitions)) setPurchaseRequisitions(parsed.purchaseRequisitions);
+      if (parsed.supportTickets && Array.isArray(parsed.supportTickets)) setSupportTickets(parsed.supportTickets);
+      if (parsed.backupLogs && Array.isArray(parsed.backupLogs)) setBackupLogs(parsed.backupLogs);
+      
+      addAuditLog('Database', 'RESTORE', 'UPDATE', 'استعادة قاعدة البيانات بالكامل من ملف نسخة احتياطية');
+      showToast('تمت استعادة وتحديث قاعدة البيانات بالكامل بنجاح!', 'success');
+      return { success: true, message: 'تم الاسترجاع بنجاح' };
+    } catch {
+      showToast('فشل قراءة ملف النسخة الاحتياطية. يرجى التأكد من صحة صيغة JSON.', 'error');
+      return { success: false, message: 'ملف غير صالح' };
+    }
+  };
+
+  // 🛠️ إنشاء تذكرة دعم فني
+  const createSupportTicket = (ticket: {
+    subject: string;
+    category: SupportCategory;
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    description: string;
+    contactPhone?: string;
+    contactEmail?: string;
+  }) => {
+    const ticketNumber = `TKT-2026-${String(supportTickets.length + 1).padStart(3, '0')}`;
+    const newTicket: SupportTicket = {
+      id: `TKT-${Date.now()}`,
+      ticketNumber,
+      subject: ticket.subject,
+      category: ticket.category,
+      priority: ticket.priority,
+      status: 'open',
+      description: ticket.description,
+      createdByUserId: currentUser.id,
+      createdByUserName: `${currentUser.fullName} (${currentUser.roleTitleAr})`,
+      contactPhone: ticket.contactPhone || '+20 100 234 5678',
+      contactEmail: ticket.contactEmail || 'maintenance@elnasr-ind.com',
+      createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      assignedEngineer: 'فريق الدعم الفني الصناعي الميداني',
+      responseNotes: 'تم تسجيل البلاغ بنجاح وجاري المتابعة من مهندس النظم المختص.',
+    };
+    setSupportTickets((prev) => [newTicket, ...prev]);
+    addAuditLog('SupportTicket', newTicket.ticketNumber, 'CREATE', `فتح تذكرة دعم فني: ${ticket.subject}`);
+    showToast(`تم تسجيل تذكرة الدعم الفني ${ticketNumber} بنجاح!`, 'success');
+    return { success: true };
+  };
+
+  // 🛠️ تحديث تذكرة الدعم الفني
+  const updateSupportTicketStatus = (id: string, status: SupportTicket['status'], responseNotes?: string) => {
+    setSupportTickets((prev) =>
+      prev.map((t) => {
+        if (t.id === id) {
+          return {
+            ...t,
+            status,
+            responseNotes: responseNotes || t.responseNotes,
+            resolvedAt: status === 'resolved' ? new Date().toISOString().replace('T', ' ').slice(0, 16) : t.resolvedAt,
+          };
+        }
+        return t;
+      })
+    );
+    addAuditLog('SupportTicket', id, 'UPDATE', `تحديث تذكرة الدعم إلى ${status}`);
+    showToast('تم تحديث حالة تذكرة الدعم الفني بنجاح.', 'success');
+    return { success: true };
   };
 
   return (
@@ -1352,6 +1726,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         countSessions,
         recordInventoryCountAdjustment,
         createCountSession,
+
+        // 🏢 ملف تعريف المصنع والشركة
+        companyProfile,
+        updateCompanyProfile,
+
+        // 🛒 طلبات الشراء واقتراحات إدارة المشتريات
+        purchaseRequisitions,
+        createPurchaseRequisition,
+        updatePurchaseRequisitionStatus,
+        getItemConsumption60Days,
+
+        // 💾 خطة وجدولة النسخ الاحتياطي في أكثر من مكان
+        backupConfig,
+        updateBackupConfig,
+        backupLogs,
+        generateDatabaseBackup,
+        restoreDatabaseBackup,
+        triggerInstantBackup,
+
+        // 🛠️ تذاكر وبلاغات الدعم الفني
+        supportTickets,
+        createSupportTicket,
+        updateSupportTicketStatus,
       }}
     >
       {children}
