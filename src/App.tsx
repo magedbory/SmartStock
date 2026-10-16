@@ -18,6 +18,7 @@ import { AlertsExpiryView } from './views/AlertsExpiryView';
 import { ReportsExportView } from './views/ReportsExportView';
 import { ImportExcelView } from './views/ImportExcelView';
 import { AuditUsersView } from './views/AuditUsersView';
+import { InventoryCountView } from './views/InventoryCountView';
 
 import { BarcodeScannerModal } from './components/BarcodeScannerModal';
 import { BarcodeLabelModal } from './components/BarcodeLabelModal';
@@ -39,6 +40,8 @@ const MainLayout: React.FC = () => {
         return <ItemsView />;
       case 'movements':
         return <MovementsView />;
+      case 'count':
+        return <InventoryCountView />;
       case 'requests':
         return <MaintenanceWorkflowView />;
       case 'locations':

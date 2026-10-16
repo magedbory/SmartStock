@@ -213,9 +213,60 @@ export interface AuditLog {
   id: string;
   actorId: string;
   actorName: string;
-  entity: string; // 'Item' | 'Movement' | 'MaintenanceRequest' | 'Location' | 'User' | 'Setting'
+  entity: string; // 'Item' | 'Movement' | 'MaintenanceRequest' | 'Location' | 'User' | 'Setting' | 'InventoryCount'
   entityId: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'REJECT' | 'FULFILL' | 'IMPORT';
   details: string;
   createdAt: string;
 }
+
+export type VarianceType = 
+  | 'damage'       // تلف أو كسر أثناء النقل والتشغيل
+  | 'loss'         // عجز غير مبرر أو فقدان
+  | 'expiry'       // انتهاء تاريخ الصلاحية واستبعاد
+  | 'data_error'   // خطأ إدخال أو تسجيل سابق
+  | 'surplus'      // زيادة وفائض غير مسجل
+  | 'routine';     // تسوية جردية دورية معتمدة
+
+export interface InventoryAdjustmentRecord {
+  id: string;
+  adjustmentNumber: string; // e.g. "ADJ-2026-001"
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  unitName: string;
+  locationId: string;
+  locationPath: string;
+  systemQty: number; // الرصيد الدفتري المسجل
+  actualQty: number; // الرصيد الفعلي بعد الجرد
+  varianceQty: number; // الفارق (الفعلي - الدفتري)
+  unitCost: number;
+  varianceValue: number; // القيمة المالية للعجز أو الزيادة
+  varianceType: VarianceType;
+  varianceTypeAr: string;
+  reason: string;
+  adjustedByUserId: string;
+  adjustedByUserName: string;
+  adjustedAt: string;
+  sessionTitle?: string;
+  status: 'approved' | 'pending_review';
+}
+
+export interface InventoryCountSession {
+  id: string;
+  sessionNumber: string;
+  title: string;
+  warehouseId?: string;
+  warehouseName?: string;
+  startedAt: string;
+  completedAt?: string;
+  status: 'in_progress' | 'completed';
+  totalItemsCounted: number;
+  matchedCount: number;
+  varianceCount: number;
+  totalVarianceValue: number;
+  conductedByUserId: string;
+  conductedByUserName: string;
+  notes?: string;
+}
+

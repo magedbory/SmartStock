@@ -16,11 +16,12 @@ import {
   FileSpreadsheet,
   Upload,
   ShieldCheck,
-  Flame
+  Flame,
+  ClipboardCheck
 } from 'lucide-react';
 
 export const Navigation: React.FC = () => {
-  const { activeTab, setActiveTab, alerts, maintenanceRequests, currentUser } = useApp();
+  const { activeTab, setActiveTab, alerts, maintenanceRequests, adjustments, currentUser } = useApp();
 
   const openAlertsCount = alerts.filter((a) => a.status === 'open').length;
   const pendingRequestsCount = maintenanceRequests.filter((r) => r.status === 'submitted' || r.status === 'approved').length;
@@ -29,6 +30,13 @@ export const Navigation: React.FC = () => {
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
     { id: 'items', label: 'دليل قطع الغيار', icon: Boxes },
     { id: 'movements', label: 'حركات المخزون', icon: ArrowRightLeft },
+    {
+      id: 'count',
+      label: 'جرد المخزن والتسويات',
+      icon: ClipboardCheck,
+      badge: adjustments.length > 0 ? adjustments.length : undefined,
+      badgeColor: 'bg-purple-800',
+    },
     {
       id: 'requests',
       label: 'طلبات الصيانة والصرف',
@@ -45,7 +53,7 @@ export const Navigation: React.FC = () => {
       badge: openAlertsCount > 0 ? openAlertsCount : undefined,
       badgeColor: 'bg-rose-600',
     },
-    { id: 'reports', label: 'التقارير وتصدير إكسل', icon: FileSpreadsheet },
+    { id: 'reports', label: 'تقارير الإدارات واتخاذ القرارات', icon: FileSpreadsheet },
     { id: 'import', label: 'استيراد الأصناف', icon: Upload },
     { id: 'audit', label: 'التدقيق والصلاحيات', icon: ShieldCheck },
   ];

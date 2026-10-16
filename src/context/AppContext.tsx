@@ -7,12 +7,14 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import {
   User, RoleType, Item, Category, Unit, Warehouse, Supplier,
   StockMovement, MaintenanceRequest, InventoryAlert, AuditLog,
-  MovementType, MaintenanceRequestType
+  MovementType, MaintenanceRequestType, InventoryAdjustmentRecord,
+  InventoryCountSession, VarianceType
 } from '../types';
 import {
   INITIAL_USERS, INITIAL_CATEGORIES, INITIAL_UNITS, INITIAL_WAREHOUSES,
   INITIAL_SUPPLIERS, INITIAL_ITEMS, INITIAL_MOVEMENTS,
-  INITIAL_MAINTENANCE_REQUESTS, INITIAL_ALERTS, INITIAL_AUDIT_LOGS
+  INITIAL_MAINTENANCE_REQUESTS, INITIAL_ALERTS, INITIAL_AUDIT_LOGS,
+  INITIAL_ADJUSTMENTS, INITIAL_COUNT_SESSIONS
 } from '../data/initialData';
 
 interface ToastInfo {
@@ -50,6 +52,8 @@ interface AppContextType {
   maintenanceRequests: MaintenanceRequest[];
   alerts: InventoryAlert[];
   auditLogs: AuditLog[];
+  adjustments: InventoryAdjustmentRecord[];
+  countSessions: InventoryCountSession[];
   activeTab: string;
   setActiveTab: (tab: string) => void;
   expiryWindowDays: number;
@@ -128,6 +132,16 @@ interface AppContextType {
 
   importItems: (newItems: Item[]) => void;
   resetToDefaultData: () => void;
+
+  recordInventoryCountAdjustment: (data: {
+    itemId: string;
+    locationId: string;
+    actualQty: number;
+    varianceType: VarianceType;
+    reason: string;
+    sessionTitle?: string;
+  }) => { success: boolean; error?: string };
+  createCountSession: (title: string, warehouseId?: string, notes?: string) => { success: boolean; error?: string };
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -146,6 +160,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>(INITIAL_MAINTENANCE_REQUESTS);
   const [alerts, setAlerts] = useState<InventoryAlert[]>(INITIAL_ALERTS);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>(INITIAL_AUDIT_LOGS);
+  const [adjustments, setAdjustments] = useState<InventoryAdjustmentRecord[]>(INITIAL_ADJUSTMENTS);
+  const [countSessions, setCountSessions] = useState<InventoryCountSession[]>(INITIAL_COUNT_SESSIONS);
 
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [expiryWindowDays, setExpiryWindowDays] = useState<number>(30);
@@ -183,6 +199,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (parsed.suppliers) setSuppliers(parsed.suppliers);
         if (parsed.alerts) setAlerts(parsed.alerts);
         if (parsed.auditLogs) setAuditLogs(parsed.auditLogs);
+        if (parsed.adjustments) setAdjustments(parsed.adjustments);
+        if (parsed.countSessions) setCountSessions(parsed.countSessions);
       }
     } catch {
       // Fallback to default
@@ -194,12 +212,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ users, items, movements, maintenanceRequests, warehouses, suppliers, alerts, auditLogs })
+        JSON.stringify({ users, items, movements, maintenanceRequests, warehouses, suppliers, alerts, auditLogs, adjustments, countSessions })
       );
     } catch {
       // Ignore quota errors
     }
-  }, [users, items, movements, maintenanceRequests, warehouses, suppliers, alerts, auditLogs]);
+  }, [users, items, movements, maintenanceRequests, warehouses, suppliers, alerts, auditLogs, adjustments, countSessions]);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
@@ -1084,6 +1102,157 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return { success: true };
   };
 
+  // Inventory Count & Adjustments
+  const recordInventoryCountAdjustment = (data: {
+    itemId: string;
+    locationId: string;
+    actualQty: number;
+    varianceType: VarianceType;
+    reason: string;
+    sessionTitle?: string;
+  }): { success: boolean; error?: string } => {
+    const item = items.find((i) => i.id === data.itemId);
+    if (!item) return { success: false, error: 'الصنف غير موجود.' };
+
+    if (!data.reason || data.reason.trim().length < 5) {
+      return { success: false, error: 'سبب التسوية إلزامي ويجب ألا يقل عن 5 أحرف لتبرير العجز أو الفائض.' };
+    }
+
+    if (data.actualQty < 0) {
+      return { success: false, error: 'الرصيد الفعلي لا يمكن أن يكون سالباً.' };
+    }
+
+    let locPath = '';
+    for (const w of warehouses) {
+      for (const sh of w.shelves) {
+        for (const sp of sh.spots) {
+          if (sp.id === data.locationId) locPath = sp.fullPath;
+        }
+      }
+    }
+
+    const currentLocBal = item.locations.find((l) => l.locationId === data.locationId);
+    const systemQty = currentLocBal ? currentLocBal.quantity : 0;
+    const varianceQty = data.actualQty - systemQty;
+    const varianceValue = Number((varianceQty * item.avgCost).toFixed(2));
+
+    const varianceTypeArMap: Record<VarianceType, string> = {
+      damage: 'تلف أو كسر أثناء النقل والتشغيل',
+      loss: 'عجز غير مبرر / فقدان',
+      expiry: 'انتهاء تاريخ الصلاحية واستبعاد',
+      data_error: 'خطأ إدخال أو تسجيل سابق',
+      surplus: 'زيادة وفائض غير مسجل',
+      routine: 'تسوية جردية دورية معتمدة',
+    };
+
+    const newAdjustmentRecord: InventoryAdjustmentRecord = {
+      id: `ADJ-${Date.now()}`,
+      adjustmentNumber: `ADJ-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+      itemId: item.id,
+      itemCode: item.code,
+      itemName: item.name,
+      unitName: item.unitName,
+      locationId: data.locationId,
+      locationPath: locPath || currentLocBal?.locationPath || 'المستودع الرئيسي',
+      systemQty,
+      actualQty: data.actualQty,
+      varianceQty,
+      unitCost: item.avgCost,
+      varianceValue,
+      varianceType: data.varianceType,
+      varianceTypeAr: varianceTypeArMap[data.varianceType] || 'تسوية جردية',
+      reason: data.reason.trim(),
+      adjustedByUserId: currentUser.id,
+      adjustedByUserName: `${currentUser.fullName} (${currentUser.roleTitleAr})`,
+      adjustedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      sessionTitle: data.sessionTitle || 'جرد ميداني مباشر',
+      status: 'approved',
+    };
+
+    // Update item stock atomically
+    const newTotalQty = Math.max(0, item.totalQuantity + varianceQty);
+    let newLocations = [...item.locations];
+    if (currentLocBal) {
+      newLocations = newLocations
+        .map((l) => (l.locationId === data.locationId ? { ...l, quantity: data.actualQty } : l))
+        .filter((l) => l.quantity > 0);
+    } else if (data.actualQty > 0) {
+      newLocations.push({ locationId: data.locationId, locationPath: locPath || 'المستودع الرئيسي', quantity: data.actualQty });
+    }
+
+    const updatedItem: Item = {
+      ...item,
+      totalQuantity: newTotalQty,
+      locations: newLocations,
+    };
+
+    setItems((prev) => prev.map((i) => (i.id === item.id ? updatedItem : i)));
+    setAdjustments((prev) => [newAdjustmentRecord, ...prev]);
+
+    // Record StockMovement as adjustment
+    const newMovement: StockMovement = {
+      id: `TRX-${Date.now()}`,
+      movementNumber: `TRX-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      type: 'adjustment',
+      typeAr: 'تسوية جردية (جرد فعلي)',
+      itemId: item.id,
+      itemCode: item.code,
+      itemName: item.name,
+      quantity: varianceQty,
+      unitName: item.unitName,
+      unitCost: item.avgCost,
+      totalValue: Math.abs(varianceValue),
+      fromLocationId: varianceQty < 0 ? data.locationId : undefined,
+      fromLocationPath: varianceQty < 0 ? locPath : undefined,
+      toLocationId: varianceQty > 0 ? data.locationId : undefined,
+      toLocationPath: varianceQty > 0 ? locPath : undefined,
+      reason: `تسوية جرد (${varianceTypeArMap[data.varianceType]}): ${data.reason.trim()}`,
+      createdAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      createdByUserId: currentUser.id,
+      createdByUserName: `${currentUser.fullName} (${currentUser.roleTitleAr})`,
+    };
+
+    setMovements((prev) => [newMovement, ...prev]);
+    updateItemAlerts(updatedItem, newTotalQty);
+
+    addAuditLog(
+      'InventoryCount',
+      newAdjustmentRecord.id,
+      'UPDATE',
+      `تسوية جرد للصنف ${item.code}: الدفتري ${systemQty} ← الفعلي ${data.actualQty} (${varianceQty > 0 ? '+' : ''}${varianceQty} ${item.unitName}) - السبب: ${data.reason.trim()}`
+    );
+
+    showToast(`تم حفظ تسوية الجرد للصنف (${item.code}) وتحديث الرصيد الفعلي.`);
+    return { success: true };
+  };
+
+  const createCountSession = (title: string, warehouseId?: string, notes?: string): { success: boolean; error?: string } => {
+    if (!title?.trim()) {
+      return { success: false, error: 'عنوان جلسة الجرد مطلوب.' };
+    }
+    const wh = warehouses.find((w) => w.id === warehouseId);
+    const newSession: InventoryCountSession = {
+      id: `SES-${Date.now()}`,
+      sessionNumber: `CNT-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+      title: title.trim(),
+      warehouseId,
+      warehouseName: wh ? wh.name : 'كافة المستودعات',
+      startedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
+      status: 'in_progress',
+      totalItemsCounted: 0,
+      matchedCount: 0,
+      varianceCount: 0,
+      totalVarianceValue: 0,
+      conductedByUserId: currentUser.id,
+      conductedByUserName: `${currentUser.fullName} (${currentUser.roleTitleAr})`,
+      notes,
+    };
+    setCountSessions((prev) => [newSession, ...prev]);
+    addAuditLog('InventoryCount', newSession.id, 'CREATE', `بدء جلسة جرد جديدة: ${newSession.title}`);
+    showToast(`تم فتح جلسة الجرد (${newSession.title}) بنجاح.`);
+    return { success: true };
+  };
+
   const resetToDefaultData = () => {
     setItems(INITIAL_ITEMS);
     setMovements(INITIAL_MOVEMENTS);
@@ -1093,6 +1262,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setAlerts(INITIAL_ALERTS);
     setAuditLogs(INITIAL_AUDIT_LOGS);
     setUsers(INITIAL_USERS);
+    setAdjustments(INITIAL_ADJUSTMENTS);
+    setCountSessions(INITIAL_COUNT_SESSIONS);
     localStorage.removeItem(STORAGE_KEY);
     showToast('تمت استعادة البيانات الأولية النموذجية بنجاح.', 'info');
   };
@@ -1176,6 +1347,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setAuthTargetUser,
         requestUserSwitch,
         verifyAndSwitchUser,
+
+        adjustments,
+        countSessions,
+        recordInventoryCountAdjustment,
+        createCountSession,
       }}
     >
       {children}
